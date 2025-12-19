@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHARP — Single Image to 3D</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0b;
+            --bg-secondary: #141416;
+            --bg-elevated: #1c1c1f;
+            --bg-card: #18181b;
+            --text-primary: #fafafa;
+            --text-secondary: #a1a1aa;
+            --text-muted: #71717a;
+            --accent: #ef4444;
+            --accent-hover: #dc2626;
+            --accent-glow: rgba(239, 68, 68, 0.15);
+            --border: rgba(255, 255, 255, 0.08);
+            --border-hover: rgba(255, 255, 255, 0.15);
+            --success: #22c55e;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 20px;
+            --radius-xl: 28px;
+            --shadow-glow: 0 0 80px rgba(239, 68, 68, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Subtle grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image: 
+                linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Gradient orb */
+        body::after {
+            content: '';
+            position: fixed;
+            top: -30%;
+            right: -20%;
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(239, 68, 68, 0.06) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 60px 24px;
+        }
+
+        .container.viewer-active {
+            max-width: 1200px;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 56px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+            letter-spacing: 0.02em;
+        }
+
+        .badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(0.8); }
+        }
+
+        h1 {
+            font-family: 'Instrument Serif', Georgia, serif;
+            font-size: clamp(48px, 10vw, 72px);
+            font-weight: 400;
+            line-height: 1.05;
+            letter-spacing: -0.03em;
+            margin-bottom: 16px;
+        }
+
+        h1 span {
+            font-style: italic;
+            color: var(--accent);
+        }
+
+        .subtitle {
+            font-size: 17px;
+            color: var(--text-secondary);
+            max-width: 440px;
+            margin: 0 auto;
+        }
+
+        /* Upload area */
+        .upload-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 48px 32px;
+            text-align: center;
+            margin-bottom: 24px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(239, 68, 68, 0.03) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .upload-card:hover::before,
+        .upload-card.drag-over::before {
+            opacity: 1;
+        }
+
+        .upload-card.drag-over {
+            border-color: var(--accent);
+            box-shadow: var(--shadow-glow);
+        }
+
+        .upload-icon {
+            width: 64px;
+            height: 64px;
+            margin: 0 auto 20px;
+            background: var(--bg-elevated);
+            border-radius: var(--radius-lg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .upload-icon svg {
+            width: 28px;
+            height: 28px;
+            stroke: var(--text-secondary);
+            stroke-width: 1.5;
+            fill: none;
+        }
+
+        .upload-title {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .upload-hint {
+            font-size: 14px;
+            color: var(--text-muted);
+            position: relative;
+            z-index: 1;
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 28px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .upload-btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        .upload-btn:active {
+            transform: translateY(0);
+        }
+
+        .upload-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        /* Preview */
+        .preview-container {
+            display: none;
+            margin-bottom: 24px;
+        }
+
+        .preview-container.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .preview-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            overflow: hidden;
+        }
+
+        .preview-image-wrapper {
+            position: relative;
+            background: var(--bg-primary);
+        }
+
+        #preview-image {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+        }
+
+        .preview-info {
+            padding: 20px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid var(--border);
+        }
+
+        .file-details {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .file-icon {
+            width: 40px;
+            height: 40px;
+            background: var(--bg-elevated);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-icon svg {
+            width: 20px;
+            height: 20px;
+            stroke: var(--text-secondary);
+        }
+
+        .file-name {
+            font-size: 14px;
+            font-weight: 500;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-size {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .remove-btn {
+            padding: 8px;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+        }
+
+        .remove-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .remove-btn svg {
+            width: 18px;
+            height: 18px;
+            display: block;
+        }
+
+        /* Generate button */
+        .generate-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 18px 32px;
+            background: linear-gradient(135deg, var(--accent) 0%, #f97316 100%);
+            color: white;
+            border: none;
+            border-radius: var(--radius-lg);
+            font-family: inherit;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 24px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .generate-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .generate-btn:hover::before {
+            opacity: 1;
+        }
+
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(239, 68, 68, 0.3);
+        }
+
+        .generate-btn:active {
+            transform: translateY(0);
+        }
+
+        .generate-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .generate-btn svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Progress */
+        .progress-container {
+            display: none;
+            margin-bottom: 24px;
+        }
+
+        .progress-container.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .progress-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+        }
+
+        .progress-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .progress-text {
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: var(--bg-elevated);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #f97316);
+            border-radius: 2px;
+            width: 0%;
+            animation: indeterminate 1.5s ease-in-out infinite;
+        }
+
+        @keyframes indeterminate {
+            0% { width: 0%; margin-left: 0; }
+            50% { width: 60%; margin-left: 20%; }
+            100% { width: 0%; margin-left: 100%; }
+        }
+
+        /* Result */
+        .result-container {
+            display: none;
+        }
+
+        .result-container.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .result-layout {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+
+        .result-layout.with-viewer {
+            grid-template-columns: 1fr 320px;
+        }
+
+        @media (max-width: 900px) {
+            .result-layout.with-viewer {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* 3D Viewer */
+        .viewer-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .viewer-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .viewer-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .viewer-title svg {
+            width: 18px;
+            height: 18px;
+            stroke: var(--accent);
+        }
+
+        .viewer-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .viewer-control-btn {
+            padding: 6px 12px;
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .viewer-control-btn:hover {
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+
+        .viewer-control-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .viewer-wrapper {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            background: #000;
+        }
+
+        #splat-viewer {
+            width: 100%;
+            height: 100%;
+        }
+
+        .viewer-loading {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 10;
+        }
+
+        .viewer-loading.hidden {
+            display: none;
+        }
+
+        .viewer-loading-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .viewer-hint {
+            padding: 12px 20px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-muted);
+            text-align: center;
+        }
+
+        .result-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xl);
+            padding: 32px;
+            text-align: center;
+        }
+
+        .success-icon {
+            width: 56px;
+            height: 56px;
+            background: rgba(34, 197, 94, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+
+        .success-icon svg {
+            width: 28px;
+            height: 28px;
+            stroke: var(--success);
+        }
+
+        .result-title {
+            font-family: 'Instrument Serif', Georgia, serif;
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+
+        .result-description {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        .result-meta {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 28px;
+            padding: 16px;
+            background: var(--bg-elevated);
+            border-radius: var(--radius-md);
+        }
+
+        .result-layout.with-viewer .result-meta {
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .meta-item {
+            text-align: center;
+        }
+
+        .meta-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .meta-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 16px 32px;
+            background: var(--success);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            font-family: inherit;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s ease;
+            margin-bottom: 16px;
+        }
+
+        .download-btn:hover {
+            background: #16a34a;
+            transform: translateY(-1px);
+        }
+
+        .download-btn svg {
+            width: 18px;
+            height: 18px;
+        }
+
+        .new-btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            font-family: inherit;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .new-btn:hover {
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+
+        /* Error */
+        .error-container {
+            display: none;
+            margin-bottom: 24px;
+        }
+
+        .error-container.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .error-card {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: var(--radius-lg);
+            padding: 20px 24px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .error-icon {
+            flex-shrink: 0;
+            width: 24px;
+            height: 24px;
+            color: var(--accent);
+        }
+
+        .error-text {
+            font-size: 14px;
+            color: var(--accent);
+        }
+
+        /* Footer info */
+        .info-section {
+            margin-top: 48px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        .info-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            text-align: center;
+        }
+
+        .info-card-icon {
+            width: 36px;
+            height: 36px;
+            background: var(--bg-elevated);
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 12px;
+        }
+
+        .info-card-icon svg {
+            width: 18px;
+            height: 18px;
+            stroke: var(--accent);
+        }
+
+        .info-card-title {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .info-card-text {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        footer p {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        footer a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        footer a:hover {
+            color: var(--accent);
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .container {
+                padding: 40px 16px;
+            }
+
+            h1 {
+                font-size: 40px;
+            }
+
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .result-meta {
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .viewer-wrapper {
+                height: 350px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="main-container">
+        <header>
+            <div class="badge">Apple ML Research</div>
+            <h1>Image to <span>3D</span></h1>
+            <p class="subtitle">Transform any photo into a 3D Gaussian Splat in seconds using SHARP</p>
+        </header>
+
+        <!-- Upload Area -->
+        <div class="upload-card" id="upload-area">
+            <div class="upload-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+            </div>
+            <div class="upload-title">Drop your image here</div>
+            <p class="upload-hint">Supports JPG, PNG, HEIC, and more</p>
+            <button class="upload-btn" onclick="document.getElementById('file-input').click()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                Choose Image
+            </button>
+            <input type="file" id="file-input" accept="image/*,.heic">
+        </div>
+
+        <!-- Preview -->
+        <div class="preview-container" id="preview-container">
+            <div class="preview-card">
+                <div class="preview-image-wrapper">
+                    <img id="preview-image" src="" alt="Preview">
+                </div>
+                <div class="preview-info">
+                    <div class="file-details">
+                        <div class="file-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <div class="file-name" id="file-name"></div>
+                            <div class="file-size" id="file-size"></div>
+                        </div>
+                    </div>
+                    <button class="remove-btn" onclick="clearImage()" title="Remove">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/>
+                            <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generate Button -->
+        <button class="generate-btn" id="generate-btn" onclick="generateGaussians()" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+            Generate 3D Gaussians
+        </button>
+
+        <!-- Progress -->
+        <div class="progress-container" id="progress-container">
+            <div class="progress-card">
+                <div class="progress-header">
+                    <div class="spinner"></div>
+                    <span class="progress-text">Processing image...</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error -->
+        <div class="error-container" id="error-container">
+            <div class="error-card">
+                <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <span class="error-text" id="error-text"></span>
+            </div>
+        </div>
+
+        <!-- Result -->
+        <div class="result-container" id="result-container">
+            <div class="result-layout with-viewer" id="result-layout">
+                <!-- 3D Viewer -->
+                <div class="viewer-card" id="viewer-card">
+                    <div class="viewer-header">
+                        <div class="viewer-title">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                                <path d="M2 17l10 5 10-5"/>
+                                <path d="M2 12l10 5 10-5"/>
+                            </svg>
+                            3D Gaussian Splat Viewer
+                        </div>
+                        <div class="viewer-controls">
+                            <button class="viewer-control-btn" onclick="resetCamera()">Reset View</button>
+                        </div>
+                    </div>
+                    <div class="viewer-wrapper">
+                        <div id="splat-viewer"></div>
+                        <div class="viewer-loading" id="viewer-loading">
+                            <div class="spinner"></div>
+                            <div class="viewer-loading-text">Loading 3D model...</div>
+                        </div>
+                    </div>
+                    <div class="viewer-hint">
+                        🖱️ Drag to rotate • Scroll to zoom • Right-click drag to pan
+                    </div>
+                </div>
+
+                <!-- Result Info -->
+                <div class="result-card">
+                    <div class="success-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"/>
+                        </svg>
+                    </div>
+                    <h2 class="result-title">3D Model Ready!</h2>
+                    <p class="result-description">Your Gaussian Splat has been generated</p>
+                    <div class="result-meta">
+                        <div class="meta-item">
+                            <div class="meta-value" id="result-device">—</div>
+                            <div class="meta-label">Device</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="meta-value" id="result-size">—</div>
+                            <div class="meta-label">Image Size</div>
+                        </div>
+                        <div class="meta-item">
+                            <div class="meta-value" id="result-focal">—</div>
+                            <div class="meta-label">Focal Length</div>
+                        </div>
+                    </div>
+                    <a class="download-btn" id="download-btn" href="#" download>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        Download .PLY
+                    </a>
+                    <button class="new-btn" onclick="reset()">Process Another</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Section -->
+        <div class="info-section">
+            <div class="info-grid">
+                <div class="info-card">
+                    <div class="info-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                    </div>
+                    <div class="info-card-title">Sub-second</div>
+                    <div class="info-card-text">Lightning fast inference</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                    </div>
+                    <div class="info-card-title">.PLY Output</div>
+                    <div class="info-card-text">Standard 3DGS format</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                    </div>
+                    <div class="info-card-title">Metric Scale</div>
+                    <div class="info-card-text">Absolute depth values</div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Powered by <a href="https://github.com/apple/ml-sharp" target="_blank">Apple ml-sharp</a> · SHARP: Monocular View Synthesis</p>
+        </footer>
+    </div>
+
+    <!-- Three.js and Gaussian Splat Viewer -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.164.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.164.0/examples/jsm/",
+            "@mkkellogg/gaussian-splats-3d": "https://unpkg.com/@mkkellogg/gaussian-splats-3d@0.4.6/build/gaussian-splats-3d.module.js"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import * as GaussianSplats3D from '@mkkellogg/gaussian-splats-3d';
+
+        let viewer = null;
+        let currentPlyUrl = null;
+
+        // Make functions available globally
+        window.initViewer = async function(plyUrl) {
+            const container = document.getElementById('splat-viewer');
+            const loadingEl = document.getElementById('viewer-loading');
+            
+            // Show loading
+            loadingEl.classList.remove('hidden');
+            
+            // Cleanup previous viewer
+            if (viewer) {
+                viewer.dispose();
+                viewer = null;
+            }
+            container.innerHTML = '';
+            
+            currentPlyUrl = plyUrl;
+            
+            try {
+                viewer = new GaussianSplats3D.Viewer({
+                    'cameraUp': [0, -1, 0],
+                    'initialCameraPosition': [0, 0, -5],
+                    'initialCameraLookAt': [0, 0, 0],
+                    'rootElement': container,
+                    'selfDrivenMode': true,
+                    'sharedMemoryForWorkers': false,
+                    'dynamicScene': false,
+                    'sceneRevealMode': GaussianSplats3D.SceneRevealMode.Gradual,
+                    'antialiased': false,
+                    'focalAdjustment': 1.0,
+                    'logLevel': GaussianSplats3D.LogLevel.None,
+                    'renderMode': GaussianSplats3D.RenderMode.OnChange
+                });
+
+                await viewer.addSplatScene(plyUrl, {
+                    'splatAlphaRemovalThreshold': 5,
+                    'showLoadingUI': false,
+                    'position': [0, 0, 0],
+                    'rotation': [0, 0, 0, 1],
+                    'scale': [1, 1, 1]
+                });
+
+                viewer.start();
+                
+                // Hide loading after a short delay for smooth transition
+                setTimeout(() => {
+                    loadingEl.classList.add('hidden');
+                }, 500);
+                
+            } catch (error) {
+                console.error('Error loading splat:', error);
+                loadingEl.innerHTML = `
+                    <div style="color: var(--accent); text-align: center; padding: 20px;">
+                        <p>Unable to load 3D viewer</p>
+                        <p style="font-size: 12px; margin-top: 8px; color: var(--text-muted);">
+                            Download the .PLY file to view in a desktop viewer
+                        </p>
+                    </div>
+                `;
+            }
+        };
+
+        window.resetCamera = function() {
+            if (viewer) {
+                // Reset to initial position
+                viewer.setFocalAdjustment(1.0);
+            }
+        };
+
+        window.disposeViewer = function() {
+            if (viewer) {
+                viewer.dispose();
+                viewer = null;
+            }
+            currentPlyUrl = null;
+        };
+    </script>
+
+    <script>
+        let selectedFile = null;
+
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-input');
+        const previewContainer = document.getElementById('preview-container');
+        const previewImage = document.getElementById('preview-image');
+        const fileName = document.getElementById('file-name');
+        const fileSize = document.getElementById('file-size');
+        const generateBtn = document.getElementById('generate-btn');
+        const progressContainer = document.getElementById('progress-container');
+        const errorContainer = document.getElementById('error-container');
+        const errorText = document.getElementById('error-text');
+        const resultContainer = document.getElementById('result-container');
+        const mainContainer = document.getElementById('main-container');
+
+        // Drag and drop
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-over');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/') && !file.name.toLowerCase().endsWith('.heic')) {
+                showError('Please select a valid image file');
+                return;
+            }
+
+            selectedFile = file;
+            
+            // Show preview
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                fileName.textContent = file.name;
+                fileSize.textContent = formatFileSize(file.size);
+                
+                uploadArea.style.display = 'none';
+                previewContainer.classList.add('active');
+                generateBtn.disabled = false;
+                
+                hideError();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function clearImage() {
+            selectedFile = null;
+            fileInput.value = '';
+            previewContainer.classList.remove('active');
+            uploadArea.style.display = 'block';
+            generateBtn.disabled = true;
+            resultContainer.classList.remove('active');
+            mainContainer.classList.remove('viewer-active');
+            hideError();
+            
+            // Cleanup viewer
+            if (window.disposeViewer) {
+                window.disposeViewer();
+            }
+        }
+
+        function showError(message) {
+            errorText.textContent = message;
+            errorContainer.classList.add('active');
+        }
+
+        function hideError() {
+            errorContainer.classList.remove('active');
+        }
+
+        async function generateGaussians() {
+            if (!selectedFile) return;
+
+            hideError();
+            resultContainer.classList.remove('active');
+            mainContainer.classList.remove('viewer-active');
+            progressContainer.classList.add('active');
+            generateBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+
+            try {
+                const response = await fetch('/api/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to process image');
+                }
+
+                // Show result
+                document.getElementById('result-device').textContent = data.device.toUpperCase();
+                document.getElementById('result-size').textContent = `${data.image_size.width}×${data.image_size.height}`;
+                document.getElementById('result-focal').textContent = `${data.focal_length_px}px`;
+                document.getElementById('download-btn').href = data.download_url;
+                document.getElementById('download-btn').download = data.filename;
+
+                progressContainer.classList.remove('active');
+                resultContainer.classList.add('active');
+                mainContainer.classList.add('viewer-active');
+
+                // Initialize 3D viewer
+                if (window.initViewer) {
+                    window.initViewer(data.download_url);
+                }
+
+            } catch (error) {
+                progressContainer.classList.remove('active');
+                showError(error.message);
+                generateBtn.disabled = false;
+            }
+        }
+
+        function reset() {
+            clearImage();
+            progressContainer.classList.remove('active');
+            resultContainer.classList.remove('active');
+            mainContainer.classList.remove('viewer-active');
+        }
+    </script>
+</body>
+</html>
